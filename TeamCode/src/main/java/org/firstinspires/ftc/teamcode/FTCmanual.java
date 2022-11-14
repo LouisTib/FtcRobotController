@@ -26,51 +26,36 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.firstinspires.ftc.teamcode;
-
 import static org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit.AMPS;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.ClassFactory;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
 import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
 import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
 
 import java.util.List;
-
-/**
- * This 2022-2023 OpMode illustrates the basics of using the TensorFlow Object Detection API to
- * determine which image is being presented to the robot.
- * <p>
- * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
- * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list.
- * <p>
- * IMPORTANT: In order to use this OpMode, you need to obtain your own Vuforia license key as
- * is explained below.
- */
-
-@TeleOp(name = "FTC_Code", group = "Concept")
+@TeleOp(name = "FTC_Manual", group = "Concept")
 
 
-public class FTCCode extends LinearOpMode {
+public class FTCmanual extends LinearOpMode {
     private ElapsedTime runtime = new ElapsedTime();
+
     private DcMotor leftDriveFront = null;
     private DcMotor rightDriveFront = null;
     private DcMotor rightDriveBack = null;
     private DcMotor leftDriveBack = null;
+
     private DcMotorEx lift = null;
     private Servo claw = null;
-
 
     /*
      * Specify the source for the Tensor Flow Model.
@@ -81,7 +66,6 @@ public class FTCCode extends LinearOpMode {
      */
     private static final String TFOD_MODEL_ASSET = "PowerPlay.tflite";
     // private static final String TFOD_MODEL_FILE  = "/sdcard/FIRST/tflitemodels/CustomTeamModel.tflite";
-
 
     private final String[] LABELS = {
             "1 Bolt",
@@ -111,7 +95,6 @@ public class FTCCode extends LinearOpMode {
         // first.
 
         waitForStart();
-
         initDrive();
         initVuforia();
         initTfod();
@@ -129,28 +112,49 @@ public class FTCCode extends LinearOpMode {
             tfod.setZoom(1.0, 16.0 / 9.0);
         }
 
-        /** Wait for the game to begin */
         telemetry.addData(">", "Press Play to start op mode");
         telemetry.update();
 
     }
 
-    /**
-     * Initialize the Vuforia localization engine.
-     */
-    private void initVuforia() {
-        /*
-         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
-         */
-        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
+    private void setOgPower() {
+        leftDriveFront.setPower(-gamepad1.left_stick_y * 0.5 + gamepad1.right_stick_x * 0.5 + gamepad1.right_trigger * 0.5 - gamepad1.left_trigger * 0.5);
+        rightDriveFront.setPower(-gamepad1.left_stick_y * 0.5 - gamepad1.right_stick_x * 0.5 - gamepad1.right_trigger * 0.5 + gamepad1.left_trigger * 0.5);
+        leftDriveBack.setPower(-gamepad1.left_stick_y * 0.5 + gamepad1.right_stick_x * 0.5 - gamepad1.right_trigger * 0.5 + gamepad1.left_trigger * 0.5);
+        rightDriveBack.setPower(-gamepad1.left_stick_y * 0.5 - gamepad1.right_stick_x * 0.5 + gamepad1.right_trigger * 0.5 - gamepad1.left_trigger * 0.5);
+    }
 
-        parameters.vuforiaLicenseKey = VUFORIA_KEY;
-        parameters.cameraName = hardwareMap.get(WebcamName.class, "Webcam 1");
+    private void runLiftToPosition(int pos) {
+        telemetry.log().add("Running lift to position: " + pos);
 
-        //  Instantiate the Vuforia engine
-        vuforia = ClassFactory.getInstance().createVuforia(parameters);
+        lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        lift.setPower(0.6); // 60% power
+        lift.setTargetPosition(pos);
 
-        telemetry.addData("Status", "Initialized");
+        // Wait for the lift to arrive at it's target position
+        while (lift.isBusy()) {
+            telemetry.addData("Lift position:", pos);
+            telemetry.addData("Lift amps", lift.getCurrent(AMPS));
+            telemetry.update();
+
+            // Overcurrent protection
+            if (lift.getCurrent(AMPS) > 7) {
+                telemetry.log().add("OVERCURRENT! Aborting!");
+                telemetry.log().add("AMPS: " + lift.getCurrent(AMPS));
+                lift.setPower(0);
+                throw new RuntimeException("Overcurrent");
+                //return;
+            }
+        }
+        telemetry.log().add("Done running lift to position: " + pos);
+    }
+
+    private void setPower(double a) {
+        leftDriveFront.setPower(a);
+        rightDriveFront.setPower(a);
+        leftDriveBack.setPower(a);
+        rightDriveBack.setPower(a);
+
 
     }
 
@@ -178,9 +182,13 @@ public class FTCCode extends LinearOpMode {
         if (opModeIsActive()) {
             while (opModeIsActive()) {
 
+
                 lift.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
                 telemetry.addData("Lift Pos", lift.getCurrentPosition());
+                telemetry.update();
                 setOgPower();
+
+                double startPosition1 = leftDriveFront.getCurrentPosition();
 
 
                 if (gamepad1.right_bumper) {
@@ -188,33 +196,22 @@ public class FTCCode extends LinearOpMode {
                     lift.setPower(0.8);
                 } else if (gamepad1.left_bumper) {
                     lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-
                     lift.setPower(-0.8);
                 } else {
                     lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
                     lift.setPower(0);
                 }
 
+                if (gamepad1.a) {
+                    claw.setPosition(0.4);
+                } else if (gamepad1.b) {
+                    claw.setPosition(1);
+                }
+
 
                 if (gamepad1.dpad_down) {
-                    while (true) {
-                        runLiftToPosition(1350);
-                        runLiftToPosition(10);
-                    }
-                    /*// Raise the lift to 1350
-                    lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                    lift.setPower(0.8);
-                    lift.setTargetPosition(1350);
-                    // Wait for the lift to arrive at it's target position
-                    while (lift.isBusy()) {
-                        // Emergency stop because we overshot
-                        if (lift.getCurrentPosition() > lift.getTargetPosition()) {
-                            telemetry.log().add("Overshot!");
-                            lift.setPower(0);
-                        }
-                    }*/
-
-                    /*while ((leftDriveFront.getCurrentPosition() - startPosition1) < 120) {
+                    runLiftToPosition(1500);
+                    while ((leftDriveFront.getCurrentPosition() - startPosition1) < 200) {
                         telemetry.addData("position", leftDriveFront.getCurrentPosition());
                         telemetry.addData("distance", (leftDriveFront.getCurrentPosition() - startPosition1));
                         setPower(0.5);
@@ -223,109 +220,31 @@ public class FTCCode extends LinearOpMode {
                     setOgPower();
                     claw.setPosition(1);
                     telemetry.log().add("Putting the lift down");
+                    runLiftToPosition(60);
 
-                    // Raise the lift to 10
-                    lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                    lift.setPower(0.8);
-                    lift.setTargetPosition(10);
-                    // Wait for the lift to arrive at it's target position
-                    while (lift.isBusy()) {
-                        // Emergency stop because we overshot
-                        if (lift.getCurrentPosition() < lift.getTargetPosition()) {
-                            telemetry.log().add("Overshot!!");
-                            lift.setPower(0);
-                        }
-                    }
-                    telemetry.log().add("Done putting the lift down");
-
-                    lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);*/
-                } else if (gamepad1.dpad_up) {
-                    telemetry.log().add("DPad Up was pressed");
-                    lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                    lift.setPower(0.8);
-                    telemetry.log().add("Waiting for arrival at top position");
-                    while (lift.getCurrentPosition() != -3045) {
-                        telemetry.addData("Current Position:", lift.getCurrentPosition());
-                        telemetry.update();
-                        lift.setTargetPosition(-3045);
-                    }
-                    telemetry.log().add("Done going up");
-                    claw.setPosition(1);
-                    telemetry.log().add("Going back down");
-                    while (lift.getCurrentPosition() != 10) {
-                        telemetry.addData("Current Position", lift.getCurrentPosition());
-                        telemetry.update();
-                        lift.setTargetPosition(10);
-                    }
-                    lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-                } else if (gamepad1.dpad_right) {
-                    lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                    lift.setPower(0.8);
-                    while (lift.getCurrentPosition() != -2200) {
-                        lift.setTargetPosition(-2200);
-                    }
-                    claw.setPosition(1);
-                    while (lift.getCurrentPosition() != 5) {
-                        lift.setTargetPosition(10);
-                    }
                     lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
                 }
 
-
-                if (gamepad1.a) {
-                    claw.setPosition(0.4);
-                } else if (gamepad1.b) {
-                    claw.setPosition(1);
-                }
             }
         }
     }
 
-    private void runLiftToPosition(int pos) {
-        telemetry.log().add("Running lift to position: " + pos);
+    private void initVuforia() {
+        /*
+         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
+         */
+        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
 
-        lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        lift.setPower(0.8); // 80% power
-        lift.setTargetPosition(pos);
+        parameters.vuforiaLicenseKey = VUFORIA_KEY;
+        parameters.cameraName = hardwareMap.get(WebcamName.class, "Webcam 1");
 
-        // Wait for the lift to arrive at it's target position
-        while (lift.isBusy()) {
-            telemetry.addData("Lift position:", pos);
-            telemetry.addData("Lift amps", lift.getCurrent(AMPS));
-            telemetry.update();
+        //  Instantiate the Vuforia engine
+        vuforia = ClassFactory.getInstance().createVuforia(parameters);
 
-            // Overcurrent protection
-            if (lift.getCurrent(AMPS) > 6) {
-                telemetry.log().add("OVERCURRENT! Aborting!");
-                telemetry.log().add("AMPS: " + lift.getCurrent(AMPS));
-                lift.setPower(0);
-                throw new RuntimeException("Overcurrent");
-                //return;
-            }
-        }
-        telemetry.log().add("Done running lift to position: " + pos);
-    }
-
-
-    private void setPower(double a) {
-        leftDriveFront.setPower(a);
-        rightDriveFront.setPower(a);
-        leftDriveBack.setPower(a);
-        rightDriveBack.setPower(a);
-
+        telemetry.addData("Status", "Initialized");
 
     }
 
-    private void setOgPower() {
-        leftDriveFront.setPower(-gamepad1.left_stick_y * 0.5 + gamepad1.right_stick_x * 0.5 + gamepad1.right_trigger * 0.5 - gamepad1.left_trigger * 0.5);
-        rightDriveFront.setPower(-gamepad1.left_stick_y * 0.5 - gamepad1.right_stick_x * 0.5 - gamepad1.right_trigger * 0.5 + gamepad1.left_trigger * 0.5);
-        leftDriveBack.setPower(-gamepad1.left_stick_y * 0.5 + gamepad1.right_stick_x * 0.5 - gamepad1.right_trigger * 0.5 + gamepad1.left_trigger * 0.5);
-        rightDriveBack.setPower(-gamepad1.left_stick_y * 0.5 - gamepad1.right_stick_x * 0.5 + gamepad1.right_trigger * 0.5 - gamepad1.left_trigger * 0.5);
-    }
-
-    /**
-     * Initialize the TensorFlow Object Detection engine.
-     */
     private void initTfod() {
         int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
                 "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
@@ -371,12 +290,3 @@ public class FTCCode extends LinearOpMode {
         }
     }
 }
-
-
-
-
-
-
-
-
-

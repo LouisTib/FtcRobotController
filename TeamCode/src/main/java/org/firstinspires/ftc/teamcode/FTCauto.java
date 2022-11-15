@@ -84,7 +84,6 @@ public class FTCauto extends LinearOpMode {
 
     }
 
-
     private void runLiftToPosition(int pos) {
         telemetry.log().add("Running lift to position: " + pos);
 
@@ -191,7 +190,6 @@ public class FTCauto extends LinearOpMode {
         }
     }
 
-
     private void initVuforia() {
         /*
          * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
@@ -253,3 +251,4 @@ public class FTCauto extends LinearOpMode {
         }
     }
 }
+//this is a a test

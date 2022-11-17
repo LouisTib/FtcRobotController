@@ -50,8 +50,7 @@ public class FTCauto extends LinearOpMode {
     };
 
 
-    private static final String VUFORIA_KEY = "AUmiib//////AAABmbrFAeBqbkd/hmTwBoU6jXFUjeYK8xAgeYu6r9ZuLmpgb4tqNl4oIhXkpbBXmCusnhPlxJ3DHEkExTnQKhvCU49Yu2jslI6vaQ+V5F21ZAbbBod6lm9zyBEpkujo7IOq2TdOaJSIdN5wW3zxrHTksfrzBuKZKRsArompruh7jrm/B4W3F/EunA8ymkVoi29W84q81XMwJyonWlS2sd3pebXvLW0YOKmA63QgdmtSpp9XVAccwiH8ND8rk7FXlIIucim1Ig5FmVPLIx88t7doptXh8uiXfHHMqXc1T1MrRvfemYaUqyg7I5lYLNjLhuRmBZO3BM/qoyjPhpMVtGNh6+z3VgaKhP7O6zI07W0mmMfO";
-
+    private static final String VUFORIA_KEY = "AVpMgDH/////AAABmQ3ZXccqGED0lWHpgDfGWrx8BPttt8dxW+xfKDGfLxak2SRZ1T+WMvNtlAs9ByF42ILh673DFX5oYwBqg5NIz/EHMKnYBeGdSzuHERRPM1VgC7d2JoM5ljvkR5CQoTS0ORYSzm2PMtFRXTunJFcjOl/MAgxdBdtH7BqH8H3DL1uU8tl6f0liUmkTCATIKafFgC3P+2RjtF092iYk12E+IQasqWcaZm8pMrptmkrGm8zPd5NxNQY9UNeMXFvHCTn4O0TDmwKDbExqylKdFB2TWLEonuLBjtk9vURQjzrcJwut34WnW4uPIYEoQ1Ruchmhaca7Xh/OV8y+B3Efs+HxhtbKzGRc4+EWbxQ6mqGVMjTz";
     private VuforiaLocalizer vuforia;
 
     private TFObjectDetector tfod;
@@ -91,7 +90,6 @@ public class FTCauto extends LinearOpMode {
         lift.setTargetPosition(pos);
         lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
-
         // Wait for the lift to arrive at it's target position
         while (lift.isBusy()) {
             telemetry.addData("Lift position:", pos);
@@ -115,14 +113,11 @@ public class FTCauto extends LinearOpMode {
         rightDriveFront.setPower(a);
         leftDriveBack.setPower(a);
         rightDriveBack.setPower(a);
-
-
     }
 
     private void strafeLeft() {
         leftDriveBack.setPower(-0.5);
         rightDriveFront.setPower(0.5);
-
 
     }
 
@@ -131,7 +126,6 @@ public class FTCauto extends LinearOpMode {
         leftDriveBack.setPower(-0.5);
         rightDriveFront.setPower(-0.5);
         leftDriveFront.setPower(0.5);
-
 
     }
 

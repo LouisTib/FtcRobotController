@@ -64,18 +64,17 @@ public class FTCmanual extends LinearOpMode {
      * has been downloaded to the Robot Controller's SD FLASH memory, it must to be loaded using loadModelFromFile()
      * Here we assume it's an Asset.    Also see method initTfod() below .
      */
-    private static final String TFOD_MODEL_ASSET = "PowerPlay.tflite";
+    private static final String TFOD_MODEL_ASSET = "RoboticsFTC_Sleeve";
+    //PowerPlay.tflite
     // private static final String TFOD_MODEL_FILE  = "/sdcard/FIRST/tflitemodels/CustomTeamModel.tflite";
 
     private final String[] LABELS = {
-            "1 Bolt",
-            "2 Bulb",
-            "3 Panel"
+            "1 Wolf", "2 Rain", "3 Skull"
     };
 
 
     private static final String VUFORIA_KEY =
-            "AUmiib//////AAABmbrFAeBqbkd/hmTwBoU6jXFUjeYK8xAgeYu6r9ZuLmpgb4tqNl4oIhXkpbBXmCusnhPlxJ3DHEkExTnQKhvCU49Yu2jslI6vaQ+V5F21ZAbbBod6lm9zyBEpkujo7IOq2TdOaJSIdN5wW3zxrHTksfrzBuKZKRsArompruh7jrm/B4W3F/EunA8ymkVoi29W84q81XMwJyonWlS2sd3pebXvLW0YOKmA63QgdmtSpp9XVAccwiH8ND8rk7FXlIIucim1Ig5FmVPLIx88t7doptXh8uiXfHHMqXc1T1MrRvfemYaUqyg7I5lYLNjLhuRmBZO3BM/qoyjPhpMVtGNh6+z3VgaKhP7O6zI07W0mmMfO";
+            "AVpMgDH/////AAABmQ3ZXccqGED0lWHpgDfGWrx8BPttt8dxW+xfKDGfLxak2SRZ1T+WMvNtlAs9ByF42ILh673DFX5oYwBqg5NIz/EHMKnYBeGdSzuHERRPM1VgC7d2JoM5ljvkR5CQoTS0ORYSzm2PMtFRXTunJFcjOl/MAgxdBdtH7BqH8H3DL1uU8tl6f0liUmkTCATIKafFgC3P+2RjtF092iYk12E+IQasqWcaZm8pMrptmkrGm8zPd5NxNQY9UNeMXFvHCTn4O0TDmwKDbExqylKdFB2TWLEonuLBjtk9vURQjzrcJwut34WnW4uPIYEoQ1Ruchmhaca7Xh/OV8y+B3Efs+HxhtbKzGRc4+EWbxQ6mqGVMjTz";
 
     /**
      * {@link #vuforia} is the variable we will use to store our instance of the Vuforia
@@ -142,8 +141,8 @@ public class FTCmanual extends LinearOpMode {
                 telemetry.log().add("OVERCURRENT! Aborting!");
                 telemetry.log().add("AMPS: " + lift.getCurrent(AMPS));
                 lift.setPower(0);
-                throw new RuntimeException("Overcurrent");
-                //return;
+                //throw new RuntimeException("Overcurrent");
+                return;
             }
         }
         telemetry.log().add("Done running lift to position: " + pos);

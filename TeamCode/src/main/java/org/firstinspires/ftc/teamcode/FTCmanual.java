@@ -96,8 +96,6 @@ public class FTCmanual extends LinearOpMode {
         waitForStart();
         initDrive();
         initVuforia();
-        initTfod();
-
 
         if (tfod != null) {
             tfod.activate();
@@ -157,6 +155,22 @@ public class FTCmanual extends LinearOpMode {
 
     }
 
+    private void initVuforia() {
+        /*
+         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
+         */
+        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
+
+        parameters.vuforiaLicenseKey = VUFORIA_KEY;
+        parameters.cameraName = hardwareMap.get(WebcamName.class, "Webcam 1");
+
+        //  Instantiate the Vuforia engine
+        vuforia = ClassFactory.getInstance().createVuforia(parameters);
+
+        telemetry.addData("Status", "Initialized");
+
+    }
+
     private void initDrive() {
 
         // Initialize the hardware variables. Note that the strings used here as parameters
@@ -181,14 +195,25 @@ public class FTCmanual extends LinearOpMode {
         if (opModeIsActive()) {
             while (opModeIsActive()) {
 
-
                 lift.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
                 telemetry.addData("Lift Pos", lift.getCurrentPosition());
-                telemetry.update();
                 setOgPower();
 
                 double startPosition1 = leftDriveFront.getCurrentPosition();
 
+                //vision var
+                int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
+                        "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+                TFObjectDetector.Parameters tfodParameters = new TFObjectDetector.Parameters(tfodMonitorViewId);
+                tfodParameters.minResultConfidence = 0.75f;
+                tfodParameters.isModelTensorFlow2 = true;
+                tfodParameters.inputSize = 300;
+                tfod = ClassFactory.getInstance().createTFObjectDetector(tfodParameters, vuforia);
+
+                // Use loadModelFromAsset() if the TF Model is built in as an asset by Android Studio
+                // Use loadModelFromFile() if you have downloaded a custom team model to the Robot Controller's FLASH.
+                tfod.loadModelFromAsset(TFOD_MODEL_ASSET, LABELS);
+                // tfod.loadModelFromFile(TFOD_MODEL_FILE, LABELS);
 
                 if (gamepad1.right_bumper) {
                     lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -207,7 +232,6 @@ public class FTCmanual extends LinearOpMode {
                     claw.setPosition(1);
                 }
 
-
                 if (gamepad1.dpad_down) {
                     runLiftToPosition(1500);
                     while ((leftDriveFront.getCurrentPosition() - startPosition1) < 200) {
@@ -224,42 +248,6 @@ public class FTCmanual extends LinearOpMode {
                     lift.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
                 }
 
-            }
-        }
-    }
-
-    private void initVuforia() {
-        /*
-         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
-         */
-        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
-
-        parameters.vuforiaLicenseKey = VUFORIA_KEY;
-        parameters.cameraName = hardwareMap.get(WebcamName.class, "Webcam 1");
-
-        //  Instantiate the Vuforia engine
-        vuforia = ClassFactory.getInstance().createVuforia(parameters);
-
-        telemetry.addData("Status", "Initialized");
-
-    }
-
-    private void initTfod() {
-        int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
-                "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-        TFObjectDetector.Parameters tfodParameters = new TFObjectDetector.Parameters(tfodMonitorViewId);
-        tfodParameters.minResultConfidence = 0.75f;
-        tfodParameters.isModelTensorFlow2 = true;
-        tfodParameters.inputSize = 300;
-        tfod = ClassFactory.getInstance().createTFObjectDetector(tfodParameters, vuforia);
-
-        // Use loadModelFromAsset() if the TF Model is built in as an asset by Android Studio
-        // Use loadModelFromFile() if you have downloaded a custom team model to the Robot Controller's FLASH.
-        tfod.loadModelFromAsset(TFOD_MODEL_ASSET, LABELS);
-        // tfod.loadModelFromFile(TFOD_MODEL_FILE, LABELS);
-
-        if (opModeIsActive()) {
-            while (opModeIsActive()) {
                 if (tfod != null) {
                     // getUpdatedRecognitions() will return null if no new information is available since
                     // the last time that call was made.
@@ -284,6 +272,7 @@ public class FTCmanual extends LinearOpMode {
 
                     }
                 }
+
                 telemetry.update();
             }
         }

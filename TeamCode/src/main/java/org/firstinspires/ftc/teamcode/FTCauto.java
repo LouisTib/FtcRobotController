@@ -4,17 +4,19 @@ import static org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit.AM
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.ClassFactory;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
 import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
 import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvCameraRotation;
+import org.openftc.easyopencv.OpenCvWebcam;
 
 import java.util.List;
 
@@ -33,52 +35,18 @@ public class FTCauto extends LinearOpMode {
     private DcMotorEx lift = null;
     private Servo claw = null;
 
-    /*
-     * Specify the source for the Tensor Flow Model.
-     * If the TensorFlowLite object model is included in the Robot Controller App as an "asset",
-     * the OpMode must to load it using loadModelFromAsset().  However, if a team generated model
-     * has been downloaded to the Robot Controller's SD FLASH memory, it must to be loaded using loadModelFromFile()
-     * Here we assume it's an Asset.    Also see method initTfod() below .
-     */
-    private static final String TFOD_MODEL_ASSET = "PowerPlay.tflite";
-    // private static final String TFOD_MODEL_FILE  = "/sdcard/FIRST/tflitemodels/CustomTeamModel.tflite";
-
-    private final String[] LABELS = {
-            "1 Bolt",
-            "2 Bulb",
-            "3 Panel"
-    };
+    TestPipeline pipeline = new TestPipeline();
 
 
-    private static final String VUFORIA_KEY = "AVpMgDH/////AAABmQ3ZXccqGED0lWHpgDfGWrx8BPttt8dxW+xfKDGfLxak2SRZ1T+WMvNtlAs9ByF42ILh673DFX5oYwBqg5NIz/EHMKnYBeGdSzuHERRPM1VgC7d2JoM5ljvkR5CQoTS0ORYSzm2PMtFRXTunJFcjOl/MAgxdBdtH7BqH8H3DL1uU8tl6f0liUmkTCATIKafFgC3P+2RjtF092iYk12E+IQasqWcaZm8pMrptmkrGm8zPd5NxNQY9UNeMXFvHCTn4O0TDmwKDbExqylKdFB2TWLEonuLBjtk9vURQjzrcJwut34WnW4uPIYEoQ1Ruchmhaca7Xh/OV8y+B3Efs+HxhtbKzGRc4+EWbxQ6mqGVMjTz";
-    private VuforiaLocalizer vuforia;
-
-    private TFObjectDetector tfod;
 
     @Override
     public void runOpMode() {
         // The TFObjectDetector uses the camera frames from the VuforiaLocalizer, so we create that
         // first.
 
+        initWebcam();
         waitForStart();
         initDrive();
-        initVuforia();
-        initTfod();
-
-
-        if (tfod != null) {
-            tfod.activate();
-
-            // The TensorFlow software will scale the input images from the camera to a lower resolution.
-            // This can result in lower detection accuracy at longer distances (> 55cm or 22").
-            // If your target is at distance greater than 50 cm (20") you can increase the magnification value
-            // to artificially zoom in to the center of image.  For best results, the "aspectRatio" argument
-            // should be set to the value of the images used to create the TensorFlow Object Detection model
-            // (typically 16/9).
-            tfod.setZoom(1.0, 16.0 / 9.0);
-        }
-
-        telemetry.addData(">", "Press Play to start op mode");
         telemetry.update();
 
     }
@@ -116,8 +84,10 @@ public class FTCauto extends LinearOpMode {
     }
 
     private void strafeLeft() {
-        leftDriveBack.setPower(-0.5);
+        rightDriveBack.setPower(-0.5);
+        leftDriveBack.setPower(0.5);
         rightDriveFront.setPower(0.5);
+        leftDriveFront.setPower(-0.5);
 
     }
 
@@ -127,6 +97,16 @@ public class FTCauto extends LinearOpMode {
         rightDriveFront.setPower(-0.5);
         leftDriveFront.setPower(0.5);
 
+    }
+
+    private double calculateInchesTraveled(double startingTicks) {
+        double TICKS_PER_REV = 537.7; // GoBuilda 5203 312RPM motor
+        double WHEEL_DIAMETER = 4; // Self-explanatory
+        double INCHES_PER_REV = WHEEL_DIAMETER * Math.PI;
+
+        double ticks_traveled = Math.abs(leftDriveFront.getCurrentPosition() - startingTicks);
+        double revolutions = ticks_traveled * TICKS_PER_REV;
+        return revolutions * INCHES_PER_REV;
     }
 
     private void initDrive() {
@@ -152,97 +132,39 @@ public class FTCauto extends LinearOpMode {
 
         if (opModeIsActive()) {
 
-
             lift.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             telemetry.addData("Lift Pos", lift.getCurrentPosition());
 
-
-
-
-
-            claw.setPosition(0.4);
-            for (int i = 0; i < 13000; i++) {
-                strafeRight();
-            }
-            setPowerAll(0);
-            runLiftToPosition(1500);
-            double startPosition1 = leftDriveFront.getCurrentPosition();
-            while ((leftDriveFront.getCurrentPosition() - startPosition1) < 225) {
-                setPowerAll(0.5);
-            }
-            setPowerAll(0);
-            claw.setPosition(1);
-            sleep(1000);
-            double startPosition2 = leftDriveFront.getCurrentPosition();
-            while ((leftDriveFront.getCurrentPosition() - startPosition2) > -150) {
-                setPowerAll(-0.5);
-            }
-            setPowerAll(0);
-            runLiftToPosition(60);
-
-
         }
-    }
 
-    private void initVuforia() {
-        /*
-         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
-         */
-        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
 
-        parameters.vuforiaLicenseKey = VUFORIA_KEY;
-        parameters.cameraName = hardwareMap.get(WebcamName.class, "Webcam 1");
+        claw.setPosition(0.4);
+        double startingPosition = leftDriveFront.getCurrentPosition();
+        while (calculateInchesTraveled(startingPosition) < 10) {
+            strafeRight();
+        }
+        setPowerAll(0);
+        runLiftToPosition(1500);
+        startingPosition = leftDriveFront.getCurrentPosition();
+        while (calculateInchesTraveled(startingPosition) < 10) {
+            setPowerAll(0.5);
+        }
+        setPowerAll(0);
+        claw.setPosition(1);
+        sleep(1000);
+        startingPosition = leftDriveFront.getCurrentPosition();
+        while (calculateInchesTraveled(startingPosition) < 5) {
+            setPowerAll(-0.5);
+        }
+        setPowerAll(0);
+        runLiftToPosition(60);
 
-        //  Instantiate the Vuforia engine
-        vuforia = ClassFactory.getInstance().createVuforia(parameters);
-
-        telemetry.addData("Status", "Initialized");
 
     }
 
-    private void initTfod() {
-        int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
-                "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-        TFObjectDetector.Parameters tfodParameters = new TFObjectDetector.Parameters(tfodMonitorViewId);
-        tfodParameters.minResultConfidence = 0.75f;
-        tfodParameters.isModelTensorFlow2 = true;
-        tfodParameters.inputSize = 300;
-        tfod = ClassFactory.getInstance().createTFObjectDetector(tfodParameters, vuforia);
+    private void initWebcam() {
 
-        // Use loadModelFromAsset() if the TF Model is built in as an asset by Android Studio
-        // Use loadModelFromFile() if you have downloaded a custom team model to the Robot Controller's FLASH.
-        tfod.loadModelFromAsset(TFOD_MODEL_ASSET, LABELS);
-        // tfod.loadModelFromFile(TFOD_MODEL_FILE, LABELS);
 
-        if (opModeIsActive()) {
-            while (opModeIsActive()) {
-                if (tfod != null) {
-                    // getUpdatedRecognitions() will return null if no new information is available since
-                    // the last time that call was made.
-                    List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
-                    if (updatedRecognitions != null) {
-                        telemetry.addData("# Objects Detected", updatedRecognitions.size());
 
-                        // step through the list of recognitions and display image position/size information for each one
-                        // Note: "Image number" refers to the randomized image orientation/number
-                        for (Recognition recognition : updatedRecognitions) {
-                            double col = (recognition.getLeft() + recognition.getRight()) / 2;
-                            double row = (recognition.getTop() + recognition.getBottom()) / 2;
-                            double width = Math.abs(recognition.getRight() - recognition.getLeft());
-                            double height = Math.abs(recognition.getTop() - recognition.getBottom());
-
-                            telemetry.addData("", " ");
-                            telemetry.addData("Image", "%s (%.0f %% Conf.)", recognition.getLabel(), recognition.getConfidence() * 100);
-                            telemetry.addData("- Position (Row/Col)", "%.0f / %.0f", row, col);
-                            telemetry.addData("- Size (Width/Height)", "%.0f / %.0f", width, height);
-
-                        }
-
-                    }
-                }
-                telemetry.update();
-            }
-        }
     }
 }
-//this is a a test

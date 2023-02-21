@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import static org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit.AMPS;
 
+import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -9,22 +10,23 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
-import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
-import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+
 import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
 import org.openftc.easyopencv.OpenCvWebcam;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.ClassFactory;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
+import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
 
 import java.util.List;
 
-@Autonomous(name = "FTC_Auto", group = "Concept")
-
-
-public class FTCauto extends LinearOpMode {
-
+@Autonomous(name = "Testauto", group = "Auto")
+public class Testauto extends LinearOpMode {
+    OpenCvCamera webcam;
     private ElapsedTime runtime = new ElapsedTime();
 
     private DcMotor leftDriveFront = null;
@@ -35,46 +37,50 @@ public class FTCauto extends LinearOpMode {
     private DcMotorEx lift = null;
     private Servo claw = null;
 
-    //TestPipeline pipeline = new TestPipeline();
-
-
-
     @Override
-    public void runOpMode() {
-        // The TFObjectDetector uses the camera frames from the VuforiaLocalizer, so we create that
-        // first.
+    public void runOpMode() throws InterruptedException {
+        WebcamName webcamName = hardwareMap.get(WebcamName.class, "Webcam 1");
+        //int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        webcam = OpenCvCameraFactory.getInstance().createWebcam(webcamName);
+        SkystoneDetector detector = new SkystoneDetector(telemetry);
+        webcam.setPipeline(detector);
+        webcam.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                webcam.startStreaming(320, 240, OpenCvCameraRotation.UPRIGHT);
+            }
 
-        initWebcam();
+            @Override
+            public void onError(int errorCode) {
+            }
+        });
+
         waitForStart();
+        // Wait for it to run the pipeline at least once
+        while (detector.getLocation() == null) {}
+
         initDrive();
-        telemetry.update();
+        boolean centered = false;
+        while (!centered) {
 
-    }
-
-    private void runLiftToPosition(int pos) {
-        telemetry.log().add("Running lift to position: " + pos);
-
-        lift.setPower(0.6); // 60% power
-        lift.setTargetPosition(pos);
-        lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-        // Wait for the lift to arrive at it's target position
-        while (lift.isBusy()) {
-            telemetry.addData("Lift position:", pos);
-            telemetry.addData("Lift amps", lift.getCurrent(AMPS));
-            telemetry.update();
-
-            // Overcurrent protection
-            if (lift.getCurrent(AMPS) > 7) {
-                telemetry.log().add("OVERCURRENT! Aborting!");
-                telemetry.log().add("AMPS: " + lift.getCurrent(AMPS));
-                lift.setPower(0);
-                throw new RuntimeException("Overcurrent");
-                //return;
+            switch (detector.getLocation()) {
+                case LEFT:
+                    strafeRight();
+                    break;
+                case CENTER:
+                    centered = true;
+                    break;
+                case RIGHT:
+                    strafeLeft();
+                    break;
+                case NOT_FOUND:
+                    // ...
             }
         }
-        telemetry.log().add("Done running lift to position: " + pos);
+
+        webcam.stopStreaming();
     }
+
 
     private void setPowerAll(double a) {
         leftDriveFront.setPower(a);
@@ -109,6 +115,32 @@ public class FTCauto extends LinearOpMode {
         return revolutions * INCHES_PER_REV;
     }
 
+    private void runLiftToPosition(int pos) {
+        telemetry.log().add("Running lift to position: " + pos);
+
+        lift.setPower(0.6); // 60% power
+        lift.setTargetPosition(pos);
+        lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        // Wait for the lift to arrive at it's target position
+        while (lift.isBusy()) {
+            telemetry.addData("Lift position:", pos);
+            telemetry.addData("Lift amps", lift.getCurrent(AMPS));
+            telemetry.update();
+
+            // Over-current protection
+            if (lift.getCurrent(AMPS) > 7) {
+                telemetry.log().add("OVERCURRENT! Aborting!");
+                telemetry.log().add("AMPS: " + lift.getCurrent(AMPS));
+                lift.setPower(0);
+                throw new RuntimeException("Overcurrent");
+                //return;
+            }
+        }
+        telemetry.log().add("Done running lift to position: " + pos);
+    }
+
+
     private void initDrive() {
 
         // Initialize the hardware variables. Note that the strings used here as parameters
@@ -130,37 +162,21 @@ public class FTCauto extends LinearOpMode {
         rightDriveBack.setDirection(DcMotor.Direction.FORWARD);
         lift.setDirection(DcMotor.Direction.REVERSE);
 
-        if (opModeIsActive()) {
+        BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
 
-            lift.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            telemetry.addData("Lift Pos", lift.getCurrentPosition());
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
 
+        imu.initialize(parameters);
+
+        double angle = imu.getAngularOrientation().firstAngle;
+
+        if (angle > 5){
+            leftDriveFront.setPower(-.1);
+            leftDriveFront.setPower(-.1);
+            leftDriveFront.setPower(-.1);
+            leftDriveFront.setPower(-.1);
         }
-
-
-        claw.setPosition(0.4);
-        while (calculateInchesTraveled(leftDriveBack.getCurrentPosition()) < 10) {
-            strafeRight();
-        }
-        setPowerAll(0);
-        runLiftToPosition(1500);
-        while (calculateInchesTraveled(leftDriveFront.getCurrentPosition()) < 10) {
-            setPowerAll(0.5);
-        }
-        setPowerAll(0);
-        claw.setPosition(1);
-        sleep(1000);
-        while (calculateInchesTraveled(leftDriveFront.getCurrentPosition()) < 5) {
-            setPowerAll(-0.5);
-        }
-        setPowerAll(0);
-        runLiftToPosition(60);
-
-
-    }
-
-    private void initWebcam() {
-
 
 
     }
